@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#faf7eb">
+  <meta name="description" content="小手划一划，切开抛到空中的水果，在果果乐园收集水果和积分。">
+  <title>水果切切乐 · 果果乐园</title>
+  <link rel="icon" href="./assets/orange.webp" type="image/webp">
+  <link rel="preload" as="image" href="./assets/orchard.webp">
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+  <svg class="icon-library" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+    <symbol id="i-sound" viewBox="0 0 24 24"><path d="M11.5 4.4 6.6 8.7H3.4v6.6h3.2l4.9 4.3z" fill="currentColor" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><g fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"><path d="M15.3 8a5.3 5.3 0 0 1 0 8M18.4 4.6a9.7 9.7 0 0 1 0 14.8"/></g></symbol>
+    <symbol id="i-mute" viewBox="0 0 24 24"><path d="M11.5 4.4 6.6 8.7H3.4v6.6h3.2l4.9 4.3z" fill="currentColor" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="m16.1 9.4 5.2 5.2m0-5.2-5.2 5.2" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"/></symbol>
+    <symbol id="i-help" viewBox="0 0 24 24"><path d="M7.7 8.3a4.3 4.3 0 1 1 6.6 3.6c-1.9 1.1-2.6 1.7-2.6 3.7" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/><circle cx="11.7" cy="19.4" r="1.45" fill="currentColor"/></symbol>
+    <symbol id="i-expand" viewBox="0 0 24 24"><path d="M4 9V4h5m6 0h5v5m0 6v5h-5M9 20H4v-5" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-collapse" viewBox="0 0 24 24"><path d="M9 4v5H4m11-5v5h5m0 6h-5v5M4 15h5v5" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-pause" viewBox="0 0 24 24"><rect x="5.3" y="3.7" width="5" height="16.6" rx="1.7" fill="currentColor"/><rect x="13.7" y="3.7" width="5" height="16.6" rx="1.7" fill="currentColor"/></symbol>
+    <symbol id="i-play" viewBox="0 0 24 24"><path d="M5.4 4.1c0-1.3 1.4-2 2.5-1.3l12 7.8a1.7 1.7 0 0 1 0 2.8l-12 7.8c-1.1.7-2.5 0-2.5-1.3z" fill="currentColor"/></symbol>
+    <symbol id="i-star" viewBox="0 0 32 32"><path d="m15 3.7-3.6 7.1-7.7 1.3c-1.2.2-1.6 1.5-.8 2.4l5.6 5.6-.9 7.7c-.2 1.2.9 2.1 2 1.6l7.1-3.5 7.1 3.2c1.1.5 2.2-.4 2-1.6l-1.6-7.7 5.4-5.7c.8-.9.3-2.3-1-2.4l-7.9-.9-3.4-7.1c-.5-1.1-1.9-1.1-2.3 0Z" fill="#ffce48" stroke="#926725" stroke-width="1.7" stroke-linejoin="round"/><path d="m15.9 7.2-2.3 4.3" stroke="#fff2a0" stroke-width="1.7" stroke-linecap="round"/></symbol>
+    <symbol id="i-basket" viewBox="0 0 40 36"><g stroke="#785329" stroke-linejoin="round" stroke-linecap="round"><path d="m9.4 16 8.1-11m13.1 11L22.4 5" fill="none" stroke-width="3.1"/><path d="m5.4 15.8 4.3 15.3c.3 1.1 1.1 1.6 2.3 1.6h16.5c1.2 0 2-.6 2.3-1.7l4.1-15.2z" fill="#eaa749" stroke-width="2"/><path d="m13.4 21.3 1.6 6.4m5-6.4v6.4m6.7-6.4-1.6 6.4" fill="none" stroke-width="2"/><rect x="3.2" y="13.4" width="33.6" height="5" rx="2.3" fill="#ffcf6e" stroke-width="2"/></g></symbol>
+    <symbol id="i-close" viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></symbol>
+    <symbol id="i-hand" viewBox="0 0 24 24"><path d="M8.7 13.4V5.9a1.8 1.8 0 1 1 3.6 0v5.3-1.4a1.5 1.5 0 0 1 3 0v1.8-1a1.4 1.4 0 1 1 2.8 0V12a1.4 1.4 0 0 1 2.8.2l-.4 4.5c-.3 3.4-2.3 5.2-5.8 5.2h-1.3c-2.7 0-4-.9-5.5-2.9L4.7 15a1.8 1.8 0 0 1 2.6-2.3l1.4 1.1Z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  </svg>
+  <header class="site-header">
+    <div class="wrap header-inner">
+      <button class="brand" id="brand" type="button" aria-label="果果乐园首页">
+        <img src="./assets/orange.webp" alt="" width="46" height="46" draggable="false">
+        <span>果果乐园</span>
+      </button>
+      <nav class="tools" aria-label="游戏设置">
+        <button class="tool sound" id="sound" type="button" aria-pressed="true" aria-label="关闭声音">
+          <svg class="icon" aria-hidden="true"><use href="#i-sound"/></svg><span>声音开</span>
+        </button>
+        <button class="tool tool-round" id="help" type="button" aria-label="怎么玩" title="怎么玩">
+          <svg class="icon" aria-hidden="true"><use href="#i-help"/></svg>
+        </button>
+      </nav>
+    </div>
+  </header>
+  <main class="wrap">
+    <section class="scene" id="scene" aria-label="水果切切乐游戏区">
+      <div class="scene-hud">
+        <div class="score" aria-label="累计积分">
+          <svg aria-hidden="true"><use href="#i-star"/></svg>
+          <span>我的积分</span><strong id="score">0</strong>
+        </div>
+        <div class="scene-tools">
+          <button class="scene-tool" id="pause" type="button" aria-label="暂停游戏" title="暂停游戏" hidden><svg class="icon" aria-hidden="true"><use href="#i-pause"/></svg></button>
+          <button class="scene-tool" id="expand" type="button" aria-label="全屏玩" title="全屏玩" aria-pressed="false"><svg class="icon" aria-hidden="true"><use href="#i-expand"/></svg></button>
+        </div>
+      </div>
+      <div id="welcome" class="welcome">
+        <svg class="flight-marks" viewBox="0 0 1200 500" preserveAspectRatio="none" aria-hidden="true">
+          <g fill="none" stroke="#fffbe5" stroke-width="3.3" stroke-linecap="round" stroke-dasharray="8 10" opacity=".92"><path d="M98 359c-28-18-45-52-42-84 2-23 10-41 24-57"/><path d="M1081 210c43 17 63 66 43 100"/><path d="M789 420q62 24 100-6"/></g>
+          <g fill="#fff8dd"><path d="M306 111q1 11 11 13-10 3-12 13-2-10-11-13 10-2 12-13Z"/><path d="M966 324q2 8 9 10-8 2-9 11-2-9-10-11 9-2 10-10Z"/></g>
+          <g fill="#ffd454"><path d="M844 108q3 13 15 16-14 4-16 17-2-14-14-17 12-3 15-16Z"/><path d="M188 314q2 8 10 10-9 2-10 11-2-9-11-11 9-2 11-10Z"/></g>
+        </svg>
+        <img aria-hidden="true" alt="" class="poster-fruit poster-watermelon" src="./assets/watermelon.webp" draggable="false">
+        <img aria-hidden="true" alt="" class="poster-fruit poster-strawberry" src="./assets/strawberry.webp" draggable="false">
+        <img aria-hidden="true" alt="" class="poster-fruit poster-orange" src="./assets/orange.webp" draggable="false">
+        <img aria-hidden="true" alt="" class="poster-fruit poster-banana" src="./assets/banana.webp" draggable="false">
+        <div class="welcome-copy">
+          <h1 class="game-title" aria-label="水果切切乐"><span aria-hidden="true">水</span><span aria-hidden="true">果</span><span aria-hidden="true">切</span><span aria-hidden="true">切</span><span aria-hidden="true">乐</span></h1>
+          <p>小手划水果，小心躲开炸弹哦！</p>
+          <button type="button" class="primary start" id="start"><svg class="icon" aria-hidden="true"><use href="#i-play"/></svg>开始游戏</button>
+        </div>
+      </div>
+      <div id="playfield" class="playfield" aria-label="滑过或点中空中的水果" hidden>
+        <div id="fruit-layer"></div>
+        <canvas id="effects" aria-hidden="true"></canvas>
+        <div class="game-hint" id="game-hint"><svg class="icon" aria-hidden="true"><use href="#i-hand"/></svg>切水果 +2 <span aria-hidden="true">·</span> 碰炸弹 −1</div>
+      </div>
+      <dialog id="dialog" aria-labelledby="dialog-title">
+        <div class="dialog-card">
+          <button class="tool tool-round close" type="button" id="dialog-close" aria-label="关闭"><svg class="icon" aria-hidden="true"><use href="#i-close"/></svg></button>
+          <div id="dialog-content"></div>
+        </div>
+      </dialog>
+    </section>
+    <section class="collection" aria-labelledby="basket-heading">
+      <div class="collection-heading">
+        <h2 id="basket-heading"><svg aria-hidden="true"><use href="#i-basket"/></svg>我的果篮</h2>
+        <div class="progress-info"><span class="progress-track" aria-hidden="true"><i id="progress-bar"></i></span><span>已收集 <b id="varieties">0 / 6</b> 种</span></div>
+      </div>
+      <div class="fruit-cards" id="fruit-cards"></div>
+    </section>
+    <p class="sr-only" role="status" id="announcement"></p>
+  </main>
+  <script type="module" src="./app.js"></script>
+</body>
+</html>
