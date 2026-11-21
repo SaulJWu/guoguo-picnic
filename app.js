@@ -1,4 +1,4 @@
-import { FruitRound, fruits } from "./orchard.js";
+import { FruitRound, fruits } from "./orchard.js?v=2";
 import { playMusic, pauseMusic, duckMusic } from "./music.js";
 
 const $ = id => document.getElementById(id);
@@ -46,7 +46,7 @@ let picked = null;
 let fallbackFullscreen = false;
 let backgroundPause = false;
 const scene = $("scene"), dialog = $("dialog");
-const round = new FruitRound($("playfield"), $("fruit-layer"), $("effects"), onHit, () => progress.score);
+const round = new FruitRound($("playfield"), $("fruit-layer"), $("effects"), $("round-message"), onHit, () => progress.score);
 const cards = new Map();
 
 for (const fruit of fruits) {
@@ -86,33 +86,36 @@ function renderBasket() {
   $("progress-bar").style.width = (varieties / fruits.length * 100) + "%";
 }
 
-function recordHit(item) {
+function recordHit({fruit, secondSlice, bonus}) {
   function apply() {
     if (progressStored) progress = savedProgress() || progress;
-    const delta = item.bomb ? -Math.min(1, progress.score) : 2;
+    const points = secondSlice ? 1 : 2 + bonus;
+    const delta = fruit.bomb ? -Math.min(1, progress.score) : points;
     progress.score += delta;
-    if (!item.bomb) progress.basket[item.id]++;
+    if (!fruit.bomb && !secondSlice) progress.basket[fruit.id]++;
     progressStored = writeLocal(progressKey, JSON.stringify(progress));
     renderBasket();
-    $("announcement").textContent = (item.bomb ? "碰到了炸弹" : "切开了" + item.name) + "，现在有 " + progress.score + " 分";
+    const action = fruit.bomb ? "碰到了炸弹" : secondSlice ? "切中西瓜片" : "切开了" + fruit.name;
+    $("announcement").textContent = action + "，现在有 " + progress.score + " 分";
     return delta;
   }
   if (navigator.locks?.request) return navigator.locks.request(progressKey, apply).catch(apply);
   return Promise.resolve(apply());
 }
 
-function onHit(item, hits, chain) {
+function onHit(hit) {
+  const {fruit, hits, chain, secondSlice, bonus} = hit;
   duckMusic();
-  impactSound(item, chain);
+  impactSound(fruit, chain, secondSlice, bonus);
   if (navigator.vibrate && !window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-    navigator.vibrate(item.bomb ? [12, 24, 12] : 9);
+    navigator.vibrate(fruit.bomb ? [12, 24, 12] : 9);
   }
   const score = $("score").parentNode;
   score.classList.remove("bump", "deduct");
   void score.offsetWidth;
-  score.classList.add(item.bomb ? "deduct" : "bump");
+  score.classList.add(fruit.bomb ? "deduct" : "bump");
   if (hits >= 3) $("game-hint").hidden = true;
-  return recordHit(item);
+  return recordHit(hit);
 }
 
 function audioContext() {
@@ -146,7 +149,7 @@ function chime(notes) {
   });
 }
 
-function impactSound(item, chain) {
+function impactSound(item, chain, secondSlice, bonus) {
   const audio = audioContext();
   if (!audio) return;
   if (!noiseBuffer) {
@@ -178,7 +181,9 @@ function impactSound(item, chain) {
   pop.connect(thump); thump.connect(audio.destination);
   pop.start(now); pop.stop(now+span);
   pop.onended = () => { pop.disconnect(); thump.disconnect(); };
-  if (!bomb) chime(chain > 1 ? [item.note*1.25, item.note*1.75] : [item.note, item.note*1.5]);
+  if (secondSlice) chime([587, 740, 880]);
+  else if (bonus) chime([523, 659, 784]);
+  else if (!bomb) chime(chain > 1 ? [item.note*1.25, item.note*1.75] : [item.note, item.note*1.5]);
 }
 
 function sayName(fruit) {
@@ -259,7 +264,7 @@ function openPanel(type, fruit = null) {
   const picture = '<img class="dialog-art" alt="" draggable="false" src="' + art.image.src + '">';
   let content;
   if (type === "help") {
-    content = '<h2 id="dialog-title">怎么玩？</h2><p>水果飞起来时，划一划或点一下。</p><div class="score-rules"><span><img src="./assets/orange.webp" alt="">切开水果 <b>+2</b></span><span><img src="./assets/bomb.webp" alt="">碰到炸弹 <b>−1</b></span></div><p class="rule-note">让炸弹飞过去就好，水果落地不扣分。<br>分数越高，水果飞得越快。掉分就会慢下来。</p>' +
+    content = '<h2 id="dialog-title">怎么玩？</h2><p>水果飞起来时，划一划或点一下。</p><div class="score-rules"><span><img src="./assets/orange.webp" alt="">切开水果 <b>+2</b></span><span><img src="./assets/bomb.webp" alt="">碰到炸弹 <b>−1</b></span></div><p class="rule-note">追切发亮的西瓜片，<b>加 1 分</b>，还会飞出五颗水果。<br>一刀切三颗，<b>额外加 3 分</b>。<br>落地不扣分。分高飞得快，掉分就放慢。</p>' +
       actionButton("play", round.state === "home" ? "开始游戏" : "继续玩");
   } else if (type === "pause") {
     content = '<h2 id="dialog-title">休息一下</h2><p>这一轮切开了 <b>' + round.hits + '</b> 个水果。</p>' +

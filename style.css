@@ -167,6 +167,20 @@ main.wrap { padding-top: 24px; padding-bottom: max(34px, env(safe-area-inset-bot
 }
 .air-fruit img { display: block; width: 100%; height: 100%; object-fit: contain; filter: drop-shadow(1px 3px 0 #365d4638); pointer-events: none; }
 .air-fruit:focus-visible { border-radius: 50%; }
+.chase-piece canvas {
+  display: block; width: 100%; height: 100%; object-fit: contain; pointer-events: none;
+  filter: drop-shadow(0 0 8px #fff2a5);
+}
+.chase-piece::before {
+  content: ""; position: absolute; inset: -4px; border: 3px dashed #fff4a0; border-radius: 50%;
+  box-shadow: 0 0 10px #ffe36e88; pointer-events: none;
+}
+.round-message {
+  pointer-events: none; position: absolute; left: 50%; top: max(61px, calc(env(safe-area-inset-top) + 58px));
+  transform: translateX(-50%); max-width: calc(100% - 18px); padding: 6px 15px; border-radius: 22px;
+  background: #31583b; color: #fff8dc; text-align: center; font-size: 18px; font-weight: 850; white-space: nowrap;
+}
+.round-message[data-kind="rain"], .round-message[data-kind="combo"] { background: #fff1b3; color: #415725; }
 .game-hint {
   pointer-events: none; position: absolute; left: 50%; bottom: max(18px, env(safe-area-inset-bottom));
   transform: translateX(-50%); justify-content: center; gap: 8px; white-space: nowrap;

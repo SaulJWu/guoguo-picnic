@@ -16,6 +16,9 @@ function clipStrip(ctx, ux, uy, a, b, reach) {
 
 function cutPiece(target, ux, uy, offset, side, span) {
   const {fruit, size} = target;
+  const image = target.chase?.image || fruit.image;
+  const width = image.naturalWidth ?? image.width;
+  const height = image.naturalHeight ?? image.height;
   const density = Math.min(devicePixelRatio || 1, 2);
   const tile = document.createElement("canvas");
   tile.width = tile.height = Math.ceil(span * density);
@@ -23,13 +26,13 @@ function cutPiece(target, ux, uy, offset, side, span) {
   ctx.scale(tile.width / span, tile.height / span);
   ctx.translate(span / 2, span / 2);
   clipStrip(ctx, ux, uy, offset, side * span, span);
-  if (!fruit.image.naturalWidth) return tile;
+  if (!width || !height) return tile;
 
   ctx.save();
   ctx.rotate(target.angle * Math.PI / 180);
-  const scale = size / Math.max(fruit.image.naturalWidth, fruit.image.naturalHeight);
-  const w = fruit.image.naturalWidth * scale, h = fruit.image.naturalHeight * scale;
-  ctx.drawImage(fruit.image, -w/2, -h/2, w, h);
+  const scale = size / Math.max(width, height);
+  const w = width * scale, h = height * scale;
+  ctx.drawImage(image, -w/2, -h/2, w, h);
   ctx.restore();
 
   // The flesh and rind end at the original silhouette and follow the same cut.
@@ -71,6 +74,37 @@ export function buildImpact(target, stroke, born, gentle, chain) {
   return { x, y, size, fruit, ux, uy, nx, ny, offset, angle: stroke.angle, pieces, span, bits, born, gentle, bomb, chain, points: bomb ? -1 : 2 };
 }
 
+export function takeChasePiece(hit) {
+  const index = hit.offset > 0 ? 0 : 1;
+  const source = hit.pieces[index];
+  const {width, height} = source;
+  // Center the target on the painted flesh instead of on the original fruit.
+  const pixels = source.getContext("2d").getImageData(0, 0, width, height).data;
+  let left = width, right = -1, top = height, bottom = -1;
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      if (pixels[(y * width + x) * 4 + 3] < 12) continue;
+      left = Math.min(left, x);
+      right = Math.max(right, x);
+      top = Math.min(top, y);
+      bottom = Math.max(bottom, y);
+    }
+  }
+  if (right < 0) return null;
+  const image = document.createElement("canvas");
+  image.width = right - left + 1;
+  image.height = bottom - top + 1;
+  image.getContext("2d").drawImage(source, left, top, image.width, image.height, 0, 0, image.width, image.height);
+  hit.pieces[index] = null;
+  const unit = hit.span / width;
+  return {
+    image, side: index === 0 ? -1 : 1,
+    x: hit.x + (left + image.width/2 - width/2) * unit,
+    y: hit.y + (top + image.height/2 - height/2) * unit,
+    size: Math.max(image.width, image.height) * unit
+  };
+}
+
 function star(ctx, x, y, r, turn) {
   ctx.save();
   ctx.translate(x, y); ctx.rotate(turn);
@@ -89,11 +123,13 @@ function drawFruitImpact(ctx, hit, t) {
   const spread = size * (gentle ? .18 : .65) * (1 - Math.exp(-5.7*flight)) + flight*(gentle ? 0 : 19);
   const fall = gentle ? 0 : size * (-.64*flight + 1.86*flight*flight);
   for (const [i, side] of [-1, 1].entries()) {
+    const piece = hit.pieces[i];
+    if (!piece) continue;
     ctx.save();
     ctx.globalAlpha = fade;
     ctx.translate(hit.x + nx*side*spread + ux*flight*11, hit.y + ny*side*spread + uy*flight*11 + fall);
     ctx.rotate(side * flight * (gentle ? .12 : .85));
-    ctx.drawImage(hit.pieces[i], -hit.span/2, -hit.span/2, hit.span, hit.span);
+    ctx.drawImage(piece, -hit.span/2, -hit.span/2, hit.span, hit.span);
     ctx.restore();
   }
 

@@ -1,4 +1,4 @@
-import { buildImpact, drawImpact } from "./impact.js";
+import { buildImpact, drawImpact, takeChasePiece } from "./impact.js?v=2";
 
 const definitions = [
   ["watermelon", "西瓜", "#e9efd8", "#cfd9b8", "#f46159", -9, 392],
@@ -22,6 +22,7 @@ export const bomb = {id: "bomb", name: "炸弹", bomb: true, image: sprite("bomb
 
 const between = (low, high) => low + Math.random() * (high - low);
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
+const chaseDuration = 1800;
 
 function paceForScore(score) {
   // Reach 1.5× at 20 points and approach 2× gradually for small hands.
@@ -45,20 +46,34 @@ function contact(target, a, b) {
   const t = length ? clamp(((x - a.x) * dx + (y - a.y) * dy) / length, 0, 1) : 0;
   const distance = Math.hypot(x - a.x - dx*t, y - a.y - dy*t);
   // Forgive near misses on fruit. The bomb only responds closer to its body.
-  const radius = target.fruit.bomb ? size*.35 : size*.48 + Math.min(12, size*.10);
+  const radius = target.fruit.bomb ? size*.35 : size*.48 + Math.min(12, size*.12);
   return distance <= radius ? {target, t, distance} : null;
 }
 
+function canFollow(chase, stroke, from, point) {
+  if (!chase || chase.origin !== stroke || chase.turned) return true;
+  const {cut, ux, uy, nx, ny} = chase;
+  const dx = point.x - cut.x, dy = point.y - cut.y;
+  const advance = dx*ux + dy*uy;
+  const previous = (from.x - cut.x)*ux + (from.y - cut.y)*uy;
+  chase.furthest = Math.max(chase.furthest, previous, advance);
+  // A straight follow-through stays one cut. Moving off that line or back along it is a new pass.
+  chase.turned = Math.abs(dx*nx + dy*ny) >= 13 || chase.furthest - advance >= 10;
+  return chase.turned;
+}
+
 export class FruitRound {
-  constructor(field, layer, canvas, onHit, getScore) {
+  constructor(field, layer, canvas, message, onHit, getScore) {
     this.field = field;
     this.layer = layer;
     this.canvas = canvas;
     this.pen = canvas.getContext("2d");
+    this.message = message;
     this.onHit = onHit;
     this.getScore = getScore;
     this.state = "home";
     this.active = [];
+    this.pending = [];
     this.cuts = [];
     this.trails = [];
     this.pointers = new Map();
@@ -82,13 +97,14 @@ export class FruitRound {
     this.effectTime = 0;
     this.freezeUntil = 0;
     this.hits = 0;
-    this.launchCount = 0;
-    this.bombDue = 4;
+    this.wave = 1;
+    this.rainUntil = 0;
+    this.messageUntil = 0;
     this.preferred = null;
-    this.bag = [first, ...shuffled(fruits.filter(fruit => fruit !== first))];
+    this.bag = shuffled(fruits.filter(fruit => fruit !== first));
     this.resize();
-    this.launch();
-    this.nextLaunch = 1150;
+    this.throwFruit(first, {middle: .5, apex: .35, scale: 1.12});
+    this.nextLaunch = 3270;
     this.restartClock();
   }
 
@@ -96,10 +112,12 @@ export class FruitRound {
     cancelAnimationFrame(this.frame);
     this.state = "home";
     this.active.length = this.cuts.length = this.trails.length = 0;
+    this.pending.length = 0;
     this.pointers.clear();
     this.layer.replaceChildren();
     this.pen.clearRect(0, 0, this.width || 0, this.height || 0);
     this.field.hidden = true;
+    this.message.hidden = true;
   }
 
   pause() {
@@ -141,61 +159,160 @@ export class FruitRound {
     this.paintEffects();
   }
 
-  launch() {
+  drawFruit() {
     if (!this.bag.length) this.bag = shuffled(fruits);
-    let fruit;
+    return this.bag.shift();
+  }
+
+  scheduleWave() {
     if (this.preferred) {
-      fruit = this.preferred;
+      this.throwFruit(this.preferred, {middle: .5, apex: .35});
+      this.bag = this.bag.filter(fruit => fruit !== this.preferred);
       this.preferred = null;
-      this.bag = this.bag.filter(item => item !== fruit);
-    } else if (this.launchCount >= this.bombDue && !this.active.some(target => target.fruit.bomb)) {
-      fruit = bomb;
-      this.bombDue = this.launchCount + Math.floor(between(5, 8));
-    } else {
-      fruit = this.bag.shift();
+      this.nextLaunch = this.flightTime + 3050;
+      return;
     }
-    const lane = [0.50, 0.22, 0.78][this.launchCount % 3];
-    const button = document.createElement("button");
-    button.type = "button";
-    button.className = "air-fruit";
-    button.setAttribute("aria-label", fruit.bomb ? "炸弹，碰到扣 1 分" : "切开" + fruit.name);
-    button.dataset.fruit = fruit.id;
+    const pattern = this.wave++ % 5;
+    if (pattern === 0) {
+      this.throwFruit(fruits[0], {middle: .5, apex: .35, scale: 1.12});
+      this.nextLaunch = this.flightTime + 3250;
+    } else if (pattern === 1 || pattern === 4) {
+      const diagonal = pattern === 4;
+      const mirror = Math.floor((this.wave - 1) / 5) % 2 === 1;
+      for (let i = 0; i < 3; i++) {
+        const lane = i - 1;
+        this.scheduleThrow(this.drawFruit(), 45 * i, {
+          middle: .5 + (mirror ? -lane : lane) * .27,
+          apex: diagonal ? .40 - lane*.12 : .40 - lane*.014,
+          travel: -lane*.085, scale: .87, duration: 3500, tilt: 0, spin: 28
+        });
+      }
+      if (diagonal) this.scheduleBomb(mirror ? .62 : .38, .65);
+      this.nextLaunch = this.flightTime + 3630;
+    } else {
+      const middle = pattern === 2 ? .33 : .66;
+      this.throwFruit(this.drawFruit(), {middle});
+      if (pattern === 3) this.scheduleBomb(.28, .49);
+      this.nextLaunch = this.flightTime + (pattern === 2 ? 2610 : 3190);
+    }
+  }
+
+  scheduleBomb(middle, apex) {
+    if (this.pending.some(throwing => throwing.fruit.bomb) || this.active.some(target => target.fruit.bomb)) return;
+    this.scheduleThrow(bomb, 240, {middle, apex, scale: .74, duration: 3200});
+  }
+
+  scheduleThrow(fruit, delay, flight) {
+    this.pending.push({fruit, at: this.flightTime + delay, flight});
+  }
+
+  releaseThrows() {
+    const due = this.pending.filter(throwing => this.flightTime >= throwing.at);
+    this.pending = this.pending.filter(throwing => this.flightTime < throwing.at);
+    for (const {fruit, flight} of due) this.throwFruit(fruit, flight);
+  }
+
+  throwFruit(fruit, flight) {
     const image = fruit.image.cloneNode();
     image.alt = "";
     image.draggable = false;
+    this.addTarget({
+      fruit, born: this.flightTime, duration: between(3770, 4280),
+      travel: between(-.18, .18), apex: between(.31, .43),
+      scale: between(.94, 1.06), tilt: between(-22, 22), spin: between(-46, 46),
+      ...flight
+    }, image);
+  }
+
+  addTarget(target, image) {
+    const {fruit, chase} = target;
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = chase ? "air-fruit chase-piece" : "air-fruit";
+    const label = chase ? "再切发亮的西瓜片" : fruit.bomb ? "炸弹，碰到扣 1 分" : "切开" + fruit.name;
+    button.setAttribute("aria-label", label);
+    button.dataset.fruit = fruit.id;
+    if (chase) image.setAttribute("aria-hidden", "true");
     button.append(image);
-    const target = {
-      fruit, button, born: this.flightTime, duration: between(4100, 4750),
-      middle: lane + between(-.035, .035), travel: between(.13, .27) * (lane > .5 ? -1 : lane < .5 ? 1 : Math.random() < .5 ? -1 : 1),
-      apex: between(.26, .41), scale: between(.94, 1.06), tilt: between(-22, 22), spin: between(-52, 52)
-    };
     button.addEventListener("click", event => {
       // Keyboard and assistive clicks do not have a pointer stroke.
       if (event.detail === 0 && this.state === "playing") this.tapTarget(target);
     });
-    this.launchCount++;
+    target.button = button;
     this.active.push(target);
     this.position(target);
     this.layer.append(button);
   }
 
   position(target) {
-    const t = clamp((this.flightTime - target.born) / target.duration, 0, 1);
-    const size = clamp(Math.min(this.width * .205, this.height * .32), 76, 172) * target.scale;
-    const bottom = this.height + size * .55;
-    const apex = Math.max(54 + size * .48, this.height * target.apex);
-    const x = clamp((target.middle + target.travel * (t - .5)) * this.width, size * .56, this.width - size * .56);
-    // A constant-gravity arc starts and ends just below the grass.
-    const y = bottom - 4 * (bottom - apex) * t * (1 - t);
+    const {chase} = target;
+    const t = clamp(((chase ? this.effectTime : this.flightTime) - target.born) / target.duration, 0, 1);
+    const size = clamp(Math.min(this.width*.205, this.height*.32), 58, 168) * target.scale;
+    let x, y, angle;
+    if (chase) {
+      const separation = size*.60 * (1 - (1 - t)**3);
+      x = chase.middle*this.width + chase.side*chase.nx*separation;
+      y = chase.apex*this.height + chase.side*chase.ny*separation - size*.26*Math.sin(t*Math.PI) + this.height*.27*t*t;
+      y = clamp(y, 48 + size*.46, this.height - size*.56);
+      angle = chase.side * 24 * t;
+    } else {
+      const bottom = this.height + size*.55;
+      const apex = Math.max(54 + size*.48, this.height*target.apex);
+      x = (target.middle + target.travel*(t - .5))*this.width;
+      // A constant-gravity arc starts and ends just below the grass.
+      y = bottom - 4*(bottom - apex)*t*(1 - t);
+      angle = target.tilt + target.spin*(t - .5);
+    }
     if (target.size !== size) {
       target.button.style.width = size + "px";
       target.button.style.height = size + "px";
     }
     target.size = size;
-    target.x = x;
+    target.x = clamp(x, size*.56, this.width - size*.56);
     target.y = y;
-    target.angle = target.tilt + target.spin * (t - .5);
-    target.button.style.transform = "translate3d(" + (x - size / 2) + "px," + (y - size / 2) + "px,0) rotate(" + target.angle + "deg)";
+    target.angle = angle;
+    target.button.style.transform = "translate3d(" + (target.x - size/2) + "px," + (y - size/2) + "px,0) rotate(" + angle + "deg)";
+  }
+
+  say(text, kind, duration) {
+    this.message.dataset.kind = kind;
+    this.message.hidden = false;
+    this.message.textContent = text;
+    this.messageUntil = this.effectTime + duration;
+  }
+
+  launchChase(impact, line, stroke, originalScale) {
+    const piece = takeChasePiece(impact);
+    if (!piece) return false;
+    const {image, x, y, side, size} = piece;
+    const chase = {
+      image, side, origin: stroke, cut: line, furthest: 0, turned: false,
+      middle: x/this.width, apex: y/this.height,
+      ux: impact.ux, uy: impact.uy, nx: impact.nx, ny: impact.ny
+    };
+    const scale = Math.max(.87, originalScale * size/impact.size);
+    this.addTarget({fruit: impact.fruit, chase, scale, born: this.effectTime, duration: chaseDuration}, image);
+    return true;
+  }
+
+  startRain() {
+    this.pending.length = 0;
+    this.active = this.active.filter(target => {
+      if (!target.fruit.bomb) return true;
+      target.button.remove();
+      return false;
+    });
+    const rain = shuffled(fruits.slice(1));
+    for (const [i, fruit] of rain.entries()) {
+      const distance = Math.abs(i - 2);
+      this.scheduleThrow(fruit, 75 + distance*85, {
+        middle: .12 + i*.19, apex: .30 + distance*.036, travel: (i-2)*.032,
+        scale: .80, duration: 3970, tilt: (i-2)*8, spin: 22
+      });
+    }
+    this.rainUntil = this.flightTime + 4300;
+    this.nextLaunch = this.rainUntil + 130;
+    this.say("果汁雨！", "rain", 1660);
   }
 
   tick(timestamp) {
@@ -207,17 +324,17 @@ export class FruitRound {
     this.lastFrame = timestamp;
     for (let i = this.active.length - 1; i >= 0; i--) {
       const target = this.active[i];
-      if (this.flightTime - target.born >= target.duration) {
+      const clock = target.chase ? this.effectTime : this.flightTime;
+      if (clock - target.born >= target.duration) {
         target.button.remove();
         this.active.splice(i, 1);
       } else {
         this.position(target);
       }
     }
-    if (this.flightTime >= this.nextLaunch && this.active.length < 3) {
-      this.launch();
-      this.nextLaunch = this.flightTime + between(1430, 1830);
-    }
+    if (this.effectTime >= this.messageUntil) this.message.hidden = true;
+    if (this.flightTime >= this.nextLaunch && this.flightTime >= this.rainUntil && !this.active.some(target => target.chase)) this.scheduleWave();
+    if (this.pending.length) this.releaseThrows();
     if (this.cuts.length || this.trails.length) this.paintEffects();
     this.frame = requestAnimationFrame(this.tick);
   }
@@ -253,7 +370,7 @@ export class FruitRound {
       }
       stroke.dragging = true;
       this.trails.push({a, b: next, born: this.effectTime});
-      const contacts = this.active.map(target => contact(target, a, next)).filter(Boolean);
+      const contacts = this.active.map(target => canFollow(target.chase, stroke, a, next) && contact(target, a, next)).filter(Boolean);
       contacts.sort((first, second) => first.t - second.t);
       contacts.forEach(hit => this.strike(hit.target, {...a, angle}, stroke));
       stroke.last = next;
@@ -278,12 +395,24 @@ export class FruitRound {
     this.active.splice(index, 1);
     target.button.remove();
     const gentle = this.reducedMotion.matches;
-    if (target.fruit.bomb) stroke.chain = 0;
-    else { stroke.chain++; this.hits++; }
-    const impact = buildImpact(target, line, this.effectTime, gentle, stroke.chain);
+    const secondSlice = Boolean(target.chase);
+    const {fruit} = target;
+    let bonus = 0;
+    if (fruit.bomb) stroke.chain = 0;
+    else if (!secondSlice) {
+      stroke.chain++;
+      this.hits++;
+      if (stroke.chain === 3 && !stroke.rewarded) { bonus = 3; stroke.rewarded = true; }
+    }
+    const impact = buildImpact(target, line, this.effectTime, gentle, secondSlice ? 0 : stroke.chain);
     this.cuts.push(impact);
-    this.onHit(target.fruit, this.hits, stroke.chain).then(delta => { impact.points = delta; });
-    this.freezeUntil = this.effectTime + (gentle ? 16 : target.fruit.bomb ? 72 : 52);
+    if (secondSlice) this.startRain();
+    else if (fruit.id === "watermelon" && !this.active.some(item => item.chase) && this.launchChase(impact, line, stroke, target.scale)) {
+      this.say("追一刀！", "chase", chaseDuration);
+    }
+    if (bonus) this.say("三连切！额外 +3", "combo", 1450);
+    this.onHit({fruit, hits: this.hits, chain: stroke.chain, secondSlice, bonus}).then(delta => { impact.points = delta; });
+    this.freezeUntil = this.effectTime + (gentle ? 16 : secondSlice ? 75 : fruit.bomb ? 72 : 52);
     if (!gentle) {
       const kick = target.fruit.bomb ? 3.8 : 2.3;
       this.layer.animate([
@@ -291,7 +420,10 @@ export class FruitRound {
         {transform: "translate(" + -kick*.55*impact.nx + "px," + -kick*.55*impact.ny + "px)"}, {transform: "translate(0,0)"}
       ], {duration: 115, easing: "ease-out"});
     }
-    if (!this.active.length) this.nextLaunch = Math.min(this.nextLaunch, this.flightTime + 380);
+    if (!this.active.length && !this.pending.length) {
+      this.rainUntil = 0;
+      this.nextLaunch = Math.min(this.nextLaunch, this.flightTime + 380);
+    }
     this.paintEffects();
   }
 
